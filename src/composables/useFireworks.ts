@@ -55,6 +55,16 @@ const randomItem = <Value>(items: Value[]) => items[Math.floor(Math.random() * i
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
+const getExplosionYRange = (height: number) => {
+  const minDistanceFromTop = clamp(height * 0.12, 88, 150)
+  const minDistanceFromBottom = clamp(height * 0.28, 220, 360)
+
+  return {
+    minY: minDistanceFromTop,
+    maxY: Math.max(minDistanceFromTop + 80, height - minDistanceFromBottom),
+  }
+}
+
 export const useFireworks = ({ canvas }: FireworkOptions) => {
   const rockets: Rocket[] = []
   const trailSparks: TrailSpark[] = []
@@ -99,8 +109,9 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
   const launch = (clientX: number) => {
     const startX = width * 0.5 + randomBetween(-32, 32)
     const startY = height + 24
+    const { minY, maxY } = getExplosionYRange(height)
     const targetX = clamp(clientX + randomBetween(-64, 64), width * 0.08, width * 0.92)
-    const targetY = randomBetween(height * 0.18, height * 0.58)
+    const targetY = randomBetween(minY, maxY)
     const angle = Math.atan2(targetY - startY, targetX - startX)
     const speed = randomBetween(8.6, 12.8)
 
@@ -236,8 +247,15 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     createTrail(rocket)
 
     const distanceToTarget = Math.hypot(rocket.targetX - rocket.x, rocket.targetY - rocket.y)
+    const reachedTargetHeight = rocket.y <= rocket.targetY
+    const reachedTarget = distanceToTarget <= 18 || reachedTargetHeight || rocket.life >= 140
 
-    return distanceToTarget > 14 && rocket.life < 140
+    if (reachedTarget) {
+      rocket.x = rocket.targetX
+      rocket.y = rocket.targetY
+    }
+
+    return !reachedTarget
   }
 
   const drawRocket = (ctx: CanvasRenderingContext2D, rocket: Rocket) => {
