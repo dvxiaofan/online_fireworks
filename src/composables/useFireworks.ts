@@ -1,5 +1,6 @@
 type FireworkOptions = {
   canvas: HTMLCanvasElement
+  onExplode?: () => void
 }
 
 type FireworkType = 'chrysanthemum' | 'peony' | 'ring' | 'willow' | 'palm' | 'crackle' | 'heart' | 'star' | 'multistage' | 'gradient'
@@ -112,7 +113,7 @@ const getStarPoints = (count: number, scale: number) => {
   return points
 }
 
-export const useFireworks = ({ canvas }: FireworkOptions) => {
+export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
   const rockets: Rocket[] = []
   const trailSparks: TrailSpark[] = []
   const particles: Particle[] = []
@@ -510,6 +511,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
 
         if (!updateRocket(rocket)) {
           explode(rocket)
+          onExplode?.()
           rockets.splice(index, 1)
           continue
         }
