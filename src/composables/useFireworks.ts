@@ -2,7 +2,7 @@ type FireworkOptions = {
   canvas: HTMLCanvasElement
 }
 
-type FireworkType = 'chrysanthemum' | 'peony' | 'ring' | 'willow' | 'palm' | 'crackle'
+type FireworkType = 'chrysanthemum' | 'peony' | 'ring' | 'willow' | 'palm' | 'crackle' | 'heart' | 'star' | 'multistage' | 'gradient'
 
 type Rocket = {
   x: number
@@ -44,9 +44,11 @@ type Particle = {
   friction: number
   shimmer: number
   crackle: boolean
+  subExplosionDelay: number
+  subExplosionDone: boolean
 }
 
-const fireworkTypes: FireworkType[] = ['chrysanthemum', 'peony', 'ring', 'willow', 'palm', 'crackle']
+const fireworkTypes: FireworkType[] = ['chrysanthemum', 'peony', 'ring', 'willow', 'palm', 'crackle', 'heart', 'star', 'multistage', 'gradient']
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min)
 
@@ -81,6 +83,33 @@ const getBurstScale = (x: number, y: number, width: number, height: number) => {
   const availableSpace = Math.min(horizontalSpace, verticalSpace * 1.25)
 
   return clamp(availableSpace / 320, 0.38, 1)
+}
+
+const getHeartPoints = (count: number, scale: number) => {
+  const points: Array<{ angle: number; speed: number }> = []
+  for (let i = 0; i < count; i++) {
+    const t = (i / count) * Math.PI * 2
+    const x = 16 * Math.pow(Math.sin(t), 3)
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+    const angle = Math.atan2(y, x)
+    const dist = Math.sqrt(x * x + y * y)
+    points.push({ angle, speed: dist * scale * 0.35 })
+  }
+  return points
+}
+
+const getStarPoints = (count: number, scale: number) => {
+  const points: Array<{ angle: number; speed: number }> = []
+  const outerRadius = count * scale * 0.22
+  const innerRadius = outerRadius * 0.45
+
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 - Math.PI / 2
+    const isOuter = Math.sin(i * 3.5) > 0
+    const radius = isOuter ? outerRadius : innerRadius
+    points.push({ angle, speed: radius * 0.12 })
+  }
+  return points
 }
 
 export const useFireworks = ({ canvas }: FireworkOptions) => {
@@ -163,6 +192,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     const isWillow = type === 'willow'
     const isPeony = type === 'peony'
     const isCrackle = type === 'crackle'
+    const isMultistage = type === 'multistage'
 
     particles.push({
       x,
@@ -179,6 +209,8 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       friction: isWillow ? randomBetween(0.973, 0.985) : randomBetween(0.962, 0.986),
       shimmer: randomBetween(0.012, 0.05),
       crackle: isCrackle && Math.random() > 0.45,
+      subExplosionDelay: isMultistage ? randomBetween(40, 80) : 0,
+      subExplosionDone: false,
     })
   }
 
@@ -218,12 +250,70 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       return
     }
 
-    const countByType: Record<Exclude<FireworkType, 'ring' | 'palm'>, [number, number]> = {
+    const countByType: Record<Exclude<FireworkType, 'ring' | 'palm' | 'heart' | 'star' | 'multistage' | 'gradient'>, [number, number]> = {
       chrysanthemum: [110, 170],
       peony: [130, 190],
       willow: [90, 140],
       crackle: [120, 180],
     }
+
+    if (rocket.type === 'heart') {
+      const count = randomInt(80, 120)
+      const heartPoints = getHeartPoints(count, rocket.burstScale * 3.5)
+      for (const point of heartPoints) {
+        createParticle(rocket.x, rocket.y, point.angle, point.speed + randomBetween(2.5, 4.5), baseHue, rocket.type, 1)
+      }
+      return
+    }
+
+    if (rocket.type === 'star') {
+      const rays = randomInt(8, 14)
+      const points = getStarPoints(rays * 5, rocket.burstScale * 3)
+      for (const point of points) {
+        createParticle(rocket.x, rocket.y, point.angle, point.speed + randomBetween(3, 6), baseHue + randomBetween(-20, 20), rocket.type, 1)
+      }
+      const outerRays = randomInt(6, 10)
+      for (let i = 0; i < outerRays; i++) {
+        const angle = (i / outerRays) * Math.PI * 2 + randomBetween(-0.1, 0.1)
+        for (let d = 0; d < 4; d++) {
+          createParticle(
+            rocket.x,
+            rocket.y,
+            angle,
+            randomBetween(4.5, 7.5) - d * 0.4,
+            baseHue + d * 15,
+            rocket.type,
+            1,
+          )
+        }
+      }
+      return
+    }
+
+    if (rocket.type === 'multistage') {
+      const count = randomInt(100, 150)
+      for (let index = 0; index < count; index += 1) {
+        const angle = randomBetween(0, Math.PI * 2)
+        const normalized = Math.sqrt(Math.random())
+        const speed = normalized * randomBetween(3, 7.5)
+        createParticle(rocket.x, rocket.y, angle, speed, baseHue, rocket.type, rocket.burstScale)
+      }
+      return
+    }
+
+    if (rocket.type === 'gradient') {
+      const count = randomInt(100, 160)
+      for (let index = 0; index < count; index += 1) {
+        const angle = randomBetween(0, Math.PI * 2)
+        const normalized = Math.sqrt(Math.random())
+        const speed = normalized * randomBetween(2.5, 8)
+        const distRatio = normalized
+        const hueOffset = distRatio * 80
+        createParticle(rocket.x, rocket.y, angle, speed, baseHue + hueOffset, rocket.type, rocket.burstScale)
+      }
+      return
+    }
+
     const [minCount, maxCount] = countByType[rocket.type]
     const count = randomInt(minCount, maxCount)
 
@@ -328,6 +418,27 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     particle.x += particle.vx
     particle.y += particle.vy
     particle.alpha -= particle.decay
+
+    if (particle.subExplosionDelay > 0) {
+      particle.subExplosionDelay -= 1
+      if (particle.subExplosionDelay === 0 && !particle.subExplosionDone) {
+        particle.subExplosionDone = true
+        const subCount = randomInt(8, 14)
+        for (let i = 0; i < subCount; i++) {
+          const angle = randomBetween(0, Math.PI * 2)
+          const speed = randomBetween(1.5, 4)
+          trailSparks.push({
+            x: particle.x,
+            y: particle.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            alpha: randomBetween(0.5, 0.9),
+            radius: randomBetween(1.5, 3),
+            hue: particle.hue + randomBetween(-30, 30),
+          })
+        }
+      }
+    }
 
     if (particle.x < 6 || particle.x > width - 6) {
       particle.x = clamp(particle.x, 6, width - 6)
