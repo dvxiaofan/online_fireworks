@@ -360,8 +360,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     createTrail(rocket)
 
     const distanceToTarget = Math.hypot(rocket.targetX - rocket.x, rocket.targetY - rocket.y)
-    const reachedTargetHeight = rocket.y <= rocket.targetY
-    const reachedTarget = distanceToTarget <= 18 || reachedTargetHeight || rocket.life >= 140
+    const reachedTarget = distanceToTarget <= 22 || rocket.life >= 160
 
     if (reachedTarget) {
       rocket.x = rocket.targetX
