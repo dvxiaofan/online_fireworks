@@ -16,6 +16,7 @@ type Rocket = {
   hue: number
   life: number
   type: FireworkType
+  burstScale: number
 }
 
 type TrailSpark = {
@@ -65,6 +66,23 @@ const getExplosionYRange = (height: number) => {
   }
 }
 
+const getExplosionXRange = (width: number) => {
+  const minDistanceFromSide = clamp(width * 0.28, 112, 260)
+
+  return {
+    minX: minDistanceFromSide,
+    maxX: Math.max(minDistanceFromSide, width - minDistanceFromSide),
+  }
+}
+
+const getBurstScale = (x: number, y: number, width: number, height: number) => {
+  const horizontalSpace = Math.min(x, width - x)
+  const verticalSpace = Math.min(y, height - y)
+  const availableSpace = Math.min(horizontalSpace, verticalSpace * 1.25)
+
+  return clamp(availableSpace / 320, 0.38, 1)
+}
+
 export const useFireworks = ({ canvas }: FireworkOptions) => {
   const rockets: Rocket[] = []
   const trailSparks: TrailSpark[] = []
@@ -109,11 +127,13 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
   const launch = (clientX: number) => {
     const startX = width * 0.5 + randomBetween(-32, 32)
     const startY = height + 24
+    const { minX, maxX } = getExplosionXRange(width)
     const { minY, maxY } = getExplosionYRange(height)
-    const targetX = clamp(clientX + randomBetween(-64, 64), width * 0.08, width * 0.92)
+    const targetX = clamp(clientX + randomBetween(-64, 64), minX, maxX)
     const targetY = randomBetween(minY, maxY)
     const angle = Math.atan2(targetY - startY, targetX - startX)
     const speed = randomBetween(8.6, 12.8)
+    const burstScale = getBurstScale(targetX, targetY, width, height)
 
     rockets.push({
       x: startX,
@@ -127,6 +147,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       hue: randomBetween(0, 360),
       life: 0,
       type: randomItem(fireworkTypes),
+      burstScale,
     })
   }
 
@@ -137,6 +158,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     speed: number,
     hue: number,
     type: FireworkType,
+    burstScale: number,
   ) => {
     const isWillow = type === 'willow'
     const isPeony = type === 'peony'
@@ -147,8 +169,8 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       y,
       previousX: x,
       previousY: y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vx: Math.cos(angle) * speed * burstScale,
+      vy: Math.sin(angle) * speed * burstScale,
       hue: hue + randomBetween(-18, 18),
       alpha: randomBetween(0.82, 1),
       decay: isWillow ? randomBetween(0.005, 0.009) : randomBetween(0.009, 0.018),
@@ -168,7 +190,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       const speed = randomBetween(4.4, 6.2)
 
       for (let index = 0; index < count; index += 1) {
-        createParticle(rocket.x, rocket.y, (Math.PI * 2 * index) / count, speed, baseHue, rocket.type)
+        createParticle(rocket.x, rocket.y, (Math.PI * 2 * index) / count, speed, baseHue, rocket.type, rocket.burstScale)
       }
 
       return
@@ -188,6 +210,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
             randomBetween(3.2, 7.4) - depth * 0.28,
             baseHue + depth * 3,
             rocket.type,
+            rocket.burstScale,
           )
         }
       }
@@ -209,7 +232,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       const normalized = Math.sqrt(Math.random())
       const speed = normalized * randomBetween(2.4, rocket.type === 'willow' ? 7.2 : 8.8)
 
-      createParticle(rocket.x, rocket.y, angle, speed, baseHue, rocket.type)
+      createParticle(rocket.x, rocket.y, angle, speed, baseHue, rocket.type, rocket.burstScale)
     }
   }
 
@@ -305,6 +328,13 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     particle.x += particle.vx
     particle.y += particle.vy
     particle.alpha -= particle.decay
+
+    if (particle.x < 6 || particle.x > width - 6) {
+      particle.x = clamp(particle.x, 6, width - 6)
+      particle.previousX = clamp(particle.previousX, 6, width - 6)
+      particle.vx *= -0.12
+      particle.alpha *= 0.68
+    }
 
     if (particle.crackle && particle.alpha < 0.55 && Math.random() < 0.035) {
       trailSparks.push({
