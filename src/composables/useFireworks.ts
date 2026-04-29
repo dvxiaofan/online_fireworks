@@ -261,7 +261,7 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
       const count = randomInt(80, 120)
       const heartPoints = getHeartPoints(count, rocket.burstScale * 3.5)
       for (const point of heartPoints) {
-        createParticle(rocket.x, rocket.y, point.angle, point.speed + randomBetween(2.5, 4.5), baseHue, rocket.type, 1)
+        createParticle(rocket.x, rocket.y, point.angle, point.speed * 0.5 + randomBetween(1.2, 2.5), baseHue, rocket.type, 1)
       }
       return
     }
