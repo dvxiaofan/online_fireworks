@@ -354,13 +354,21 @@ export const useFireworks = ({ canvas }: FireworkOptions) => {
     rocket.x += rocket.vx
     rocket.y += rocket.vy
     rocket.vx += randomBetween(-0.025, 0.025)
-    rocket.vy += 0.035
+    if (rocket.vy > -2) {
+      rocket.vy += 0.08
+    } else {
+      rocket.vy += 0.025
+    }
     rocket.life += 1
 
     createTrail(rocket)
 
+    if (rocket.y > height + 20 || rocket.life >= 200) {
+      return false
+    }
+
     const distanceToTarget = Math.hypot(rocket.targetX - rocket.x, rocket.targetY - rocket.y)
-    const reachedTarget = distanceToTarget <= 22 || rocket.life >= 160
+    const reachedTarget = distanceToTarget <= 22
 
     if (reachedTarget) {
       rocket.x = rocket.targetX
