@@ -17,15 +17,25 @@ const toggleSound = () => {
 
 const toggleAutoMode = () => {
   autoMode.value = !autoMode.value
+  if (autoMode.value) {
+    startAutoFire()
+  } else {
+    stopAutoFire()
+  }
 }
 
 const startAutoFire = () => {
   if (autoInterval) return
   autoInterval = window.setInterval(() => {
-    const event = new MouseEvent('click', {
-      clientX: Math.random() * window.innerWidth * 0.6 + window.innerWidth * 0.2,
-    })
-    window.dispatchEvent(event)
+    const canvas = document.querySelector('canvas')
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect()
+      const clientX = rect.left + Math.random() * rect.width * 0.6 + rect.width * 0.2
+      canvas.dispatchEvent(new MouseEvent('click', {
+        clientX,
+        bubbles: true,
+      }))
+    }
   }, 1200)
 }
 
@@ -39,10 +49,15 @@ const stopAutoFire = () => {
 const onKeyDown = (e: KeyboardEvent) => {
   if (e.code === 'Space' || e.code === 'Enter') {
     e.preventDefault()
-    const event = new MouseEvent('click', {
-      clientX: Math.random() * window.innerWidth * 0.6 + window.innerWidth * 0.2,
-    })
-    window.dispatchEvent(event)
+    const canvas = document.querySelector('canvas')
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect()
+      const clientX = rect.left + Math.random() * rect.width * 0.6 + rect.width * 0.2
+      canvas.dispatchEvent(new MouseEvent('click', {
+        clientX,
+        bubbles: true,
+      }))
+    }
   }
   if (e.code === 'KeyA') {
     toggleAutoMode()
@@ -70,7 +85,7 @@ onUnmounted(() => {
       class="auto-toggle"
       :class="{ active: autoMode }"
       aria-label="Toggle auto mode"
-      @click="autoMode ? (stopAutoFire(), autoMode = false) : (startAutoFire(), autoMode = true)"
+      @click="toggleAutoMode"
     >
       <svg viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
