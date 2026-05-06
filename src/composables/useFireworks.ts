@@ -242,9 +242,19 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     const { minY, maxY } = getExplosionYRange(height)
     const targetX = clamp(clientX + randomBetween(-64, 64), minX, maxX)
     const targetY = randomBetween(minY, maxY)
-    const angle = Math.atan2(targetY - startY, targetX - startX)
-    const speed = randomBetween(8.6, 12.8)
     const burstScale = getBurstScale(targetX, targetY, width, height)
+
+    // 反推弹道:给定飞行帧数 t,在重力作用下解出能真正命中 (targetX, targetY)
+    // 的初速度。原本用 angle*speed 直接指向目标,忽略了 updateRocket 里
+    // 每帧叠加的重力 → vy 衰减 → y 落后、x 超调 → 火箭飞出屏幕外才爆炸。
+    //   x(t) = startX + vx·t           ⇒ vx = Δx / t
+    //   y(t) = startY + vy·t + ½·g·t²  ⇒ vy = Δy/t − ½·g·t
+    const flightTime = randomBetween(80, 110)
+    // updateRocket 中 vy < -2 时重力 0.025,>= -2 时 0.08。火箭多数时间
+    // 在快速上升期(vy 很负),用 0.025 作为有效重力近似。
+    const effectiveGravity = 0.025
+    const vx = (targetX - startX) / flightTime
+    const vy = (targetY - startY) / flightTime - 0.5 * effectiveGravity * flightTime
 
     rockets.push({
       x: startX,
@@ -253,8 +263,8 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
       previousY: startY,
       targetX,
       targetY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vx,
+      vy,
       hue: sampleHue(),
       life: 0,
       type: randomItem(fireworkTypes),
@@ -452,7 +462,10 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     const distanceToTarget = Math.hypot(rocket.targetX - rocket.x, rocket.targetY - rocket.y)
     const heightReached = rocket.y <= rocket.targetY
     const horizontalClose = Math.abs(rocket.targetX - rocket.x) < 60
-    const reachedTarget = distanceToTarget <= 28 || (heightReached && horizontalClose)
+    // 安全网:火箭即将飞出屏幕也立刻爆炸,避免在屏幕外不可见地爆炸。
+    // 弹道公式即使配合随机漂移也基本能命中目标,这里只是兜底。
+    const offScreen = rocket.x < 30 || rocket.x > width - 30
+    const reachedTarget = distanceToTarget <= 28 || (heightReached && horizontalClose) || offScreen
 
     if (reachedTarget) {
       rocket.x = rocket.targetX
