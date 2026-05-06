@@ -1,59 +1,77 @@
-let audioContext: AudioContext | null = null
-let enabled = false
+import { ref } from 'vue'
 
-const getAudioContext = () => {
-  if (!audioContext) {
-    audioContext = new AudioContext()
-  }
-  return audioContext
-}
-
-const playTone = (frequency: number, duration: number, volume: number, type: OscillatorType = 'sine') => {
-  const ctx = getAudioContext()
-  const oscillator = ctx.createOscillator()
-  const gainNode = ctx.createGain()
-
-  oscillator.connect(gainNode)
-  gainNode.connect(ctx.destination)
-
-  oscillator.type = type
-  oscillator.frequency.setValueAtTime(frequency, ctx.currentTime)
-
-  gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-  gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
-
-  oscillator.start(ctx.currentTime)
-  oscillator.stop(ctx.currentTime + duration)
+type AudioContextCtor = typeof AudioContext
+const getCtor = (): AudioContextCtor | null => {
+  if (typeof window === 'undefined') return null
+  return (
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext ||
+    null
+  )
 }
 
 export const useSound = () => {
-  const setEnabled = (value: boolean) => {
-    enabled = value
+  const enabled = ref(false)
+  let audioContext: AudioContext | null = null
+
+  const ensureContext = (): AudioContext | null => {
+    if (audioContext) return audioContext
+    const Ctor = getCtor()
+    if (!Ctor) return null
+    audioContext = new Ctor()
+    return audioContext
   }
 
-  const isEnabled = () => enabled
+  const setEnabled = (value: boolean) => {
+    enabled.value = value
+    if (value) {
+      const ctx = ensureContext()
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume()
+      }
+    }
+  }
+
+  const playTone = (
+    ctx: AudioContext,
+    frequency: number,
+    duration: number,
+    volume: number,
+    type: OscillatorType = 'sine',
+  ) => {
+    const oscillator = ctx.createOscillator()
+    const gainNode = ctx.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(ctx.destination)
+
+    oscillator.type = type
+    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime)
+
+    gainNode.gain.setValueAtTime(volume, ctx.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+
+    oscillator.start(ctx.currentTime)
+    oscillator.stop(ctx.currentTime + duration)
+  }
 
   const playLaunch = () => {
-    if (!enabled) return
+    if (!enabled.value) return
+    const ctx = ensureContext()
+    if (!ctx) return
+    if (ctx.state === 'suspended') ctx.resume()
 
-    const ctx = getAudioContext()
-    if (ctx.state === 'suspended') {
-      ctx.resume()
-    }
-
-    playTone(280, 0.15, 0.15, 'triangle')
+    playTone(ctx, 280, 0.15, 0.15, 'triangle')
     setTimeout(() => {
-      playTone(380, 0.1, 0.08, 'triangle')
+      playTone(ctx, 380, 0.1, 0.08, 'triangle')
     }, 50)
   }
 
   const playExplode = () => {
-    if (!enabled) return
-
-    const ctx = getAudioContext()
-    if (ctx.state === 'suspended') {
-      ctx.resume()
-    }
+    if (!enabled.value) return
+    const ctx = ensureContext()
+    if (!ctx) return
+    if (ctx.state === 'suspended') ctx.resume()
 
     const noiseLength = 0.3
     const bufferSize = ctx.sampleRate * noiseLength
@@ -84,10 +102,18 @@ export const useSound = () => {
     source.stop(ctx.currentTime + noiseLength)
   }
 
+  const dispose = () => {
+    if (audioContext) {
+      audioContext.close().catch(() => {})
+      audioContext = null
+    }
+  }
+
   return {
+    enabled,
     setEnabled,
-    isEnabled,
     playLaunch,
     playExplode,
+    dispose,
   }
 }

@@ -5,6 +5,75 @@ type FireworkOptions = {
 
 type FireworkType = 'chrysanthemum' | 'peony' | 'ring' | 'willow' | 'palm' | 'crackle' | 'heart' | 'star' | 'multistage' | 'gradient'
 
+export type ThemeId = 'default' | 'cny' | 'christmas' | 'birthday' | 'sakura' | 'ocean'
+
+type Theme = {
+  id: ThemeId
+  name: string
+  // hue 区间(支持跨 0/360 边界,使用多个 bucket)
+  hueBuckets: Array<[number, number]>
+}
+
+export const THEMES: Theme[] = [
+  {
+    id: 'default',
+    name: '随机',
+    hueBuckets: [[0, 360]],
+  },
+  {
+    id: 'cny',
+    name: '春节',
+    // 红、金、橙
+    hueBuckets: [
+      [350, 360],
+      [0, 18],
+      [38, 55],
+    ],
+  },
+  {
+    id: 'christmas',
+    name: '圣诞',
+    // 红、绿、白偏冷蓝
+    hueBuckets: [
+      [350, 360],
+      [0, 12],
+      [110, 140],
+      [190, 210],
+    ],
+  },
+  {
+    id: 'birthday',
+    name: '生日',
+    // 粉、紫、黄
+    hueBuckets: [
+      [290, 330],
+      [255, 285],
+      [45, 60],
+    ],
+  },
+  {
+    id: 'sakura',
+    name: '樱花',
+    // 粉白
+    hueBuckets: [
+      [310, 350],
+      [0, 10],
+    ],
+  },
+  {
+    id: 'ocean',
+    name: '海洋',
+    // 蓝绿青
+    hueBuckets: [
+      [170, 220],
+      [220, 250],
+    ],
+  },
+]
+
+const getThemeById = (id: ThemeId): Theme =>
+  THEMES.find((t) => t.id === id) ?? THEMES[0]
+
 type Rocket = {
   x: number
   y: number
@@ -123,6 +192,18 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
   let width = 0
   let height = 0
   let pixelRatio = 1
+  let currentTheme: Theme = getThemeById('default')
+
+  const sampleHue = () => {
+    const bucket = currentTheme.hueBuckets[
+      Math.floor(Math.random() * currentTheme.hueBuckets.length)
+    ]
+    return randomBetween(bucket[0], bucket[1])
+  }
+
+  const setTheme = (id: ThemeId) => {
+    currentTheme = getThemeById(id)
+  }
 
   const paintSky = (ctx: CanvasRenderingContext2D) => {
     const gradient = ctx.createLinearGradient(0, 0, 0, height)
@@ -174,7 +255,7 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
       targetY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      hue: randomBetween(0, 360),
+      hue: sampleHue(),
       life: 0,
       type: randomItem(fireworkTypes),
       burstScale,
@@ -496,9 +577,14 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
 
   const limitParticles = () => {
     const maxParticles = 3400
+    const maxTrailSparks = 5000
 
     if (particles.length > maxParticles) {
       particles.splice(0, particles.length - maxParticles)
+    }
+
+    if (trailSparks.length > maxTrailSparks) {
+      trailSparks.splice(0, trailSparks.length - maxTrailSparks)
     }
   }
 
@@ -562,5 +648,6 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     launch,
     start,
     stop,
+    setTheme,
   }
 }
