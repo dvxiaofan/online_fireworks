@@ -36,7 +36,7 @@ onMounted(() => {
 
   fireworks = useFireworks({
     canvas,
-    onExplode: () => sound.playExplode(),
+    onExplode: (type, burstScale) => sound.playExplode(type, burstScale),
   })
   if (props.initialTheme) fireworks.setTheme(props.initialTheme)
   fireworks.start()

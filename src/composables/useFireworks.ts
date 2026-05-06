@@ -1,9 +1,9 @@
 type FireworkOptions = {
   canvas: HTMLCanvasElement
-  onExplode?: () => void
+  onExplode?: (type: FireworkType, burstScale: number) => void
 }
 
-type FireworkType = 'chrysanthemum' | 'peony' | 'ring' | 'willow' | 'palm' | 'crackle' | 'heart' | 'star' | 'multistage' | 'gradient'
+export type FireworkType = 'chrysanthemum' | 'peony' | 'ring' | 'willow' | 'palm' | 'crackle' | 'heart' | 'star' | 'multistage' | 'gradient'
 
 export type ThemeId = 'default' | 'cny' | 'christmas' | 'birthday' | 'sakura' | 'ocean'
 
@@ -610,7 +610,7 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
 
         if (!updateRocket(rocket)) {
           explode(rocket)
-          onExplode?.()
+          onExplode?.(rocket.type, rocket.burstScale)
           rockets.splice(index, 1)
           continue
         }
