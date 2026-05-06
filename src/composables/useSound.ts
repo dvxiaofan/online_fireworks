@@ -98,6 +98,41 @@ export const useSound = () => {
     whooshGain.connect(ctx.destination)
     whooshSrc.start(now + 0.02)
     whooshSrc.stop(now + 0.02 + whooshDuration)
+
+    // ── 第三层:哨声"咻——"——sine 振荡器升调,~480ms
+    // 模拟"哨笛型"烟花的高频啸叫,在第二层嘶声之上叠一条清晰的旋律线。
+    // 起音稍晚(50ms),让点火砰先到位,避免三层同时起音糊在一起。
+    const whistleDuration = 0.48
+    const whistleStart = now + 0.05
+    const whistleEnd = whistleStart + whistleDuration
+
+    const whistle = ctx.createOscillator()
+    whistle.type = 'sine'
+    whistle.frequency.setValueAtTime(1400, whistleStart)
+    whistle.frequency.exponentialRampToValueAtTime(3400, whistleEnd)
+
+    // Vibrato:8Hz 颤音,深度 ±14Hz,让纯音不死板
+    const vibrato = ctx.createOscillator()
+    vibrato.type = 'sine'
+    vibrato.frequency.value = 8
+    const vibratoDepth = ctx.createGain()
+    vibratoDepth.gain.value = 14
+    vibrato.connect(vibratoDepth)
+    vibratoDepth.connect(whistle.frequency)
+    vibrato.start(whistleStart)
+    vibrato.stop(whistleEnd)
+
+    const whistleGain = ctx.createGain()
+    // 高频 sine 直接 0.06 已经很尖,更高反而刺耳。包络让尾段尽快淡出。
+    whistleGain.gain.setValueAtTime(0.0001, whistleStart)
+    whistleGain.gain.exponentialRampToValueAtTime(0.05, whistleStart + 0.13)
+    whistleGain.gain.setValueAtTime(0.05, whistleStart + whistleDuration * 0.7)
+    whistleGain.gain.exponentialRampToValueAtTime(0.001, whistleEnd)
+
+    whistle.connect(whistleGain)
+    whistleGain.connect(ctx.destination)
+    whistle.start(whistleStart)
+    whistle.stop(whistleEnd)
   }
 
   const playExplode = () => {
