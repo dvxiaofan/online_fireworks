@@ -32,3 +32,4 @@ test-results/
 # Temporary files
 tmp/
 *.tmp
+.vercel
