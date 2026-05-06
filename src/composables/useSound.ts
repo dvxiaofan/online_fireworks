@@ -32,39 +32,72 @@ export const useSound = () => {
     }
   }
 
-  const playTone = (
-    ctx: AudioContext,
-    frequency: number,
-    duration: number,
-    volume: number,
-    type: OscillatorType = 'sine',
-  ) => {
-    const oscillator = ctx.createOscillator()
-    const gainNode = ctx.createGain()
-
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-
-    oscillator.type = type
-    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime)
-
-    gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
-
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + duration)
-  }
-
   const playLaunch = () => {
     if (!enabled.value) return
     const ctx = ensureContext()
     if (!ctx) return
     if (ctx.state === 'suspended') ctx.resume()
 
-    playTone(ctx, 280, 0.15, 0.15, 'triangle')
-    setTimeout(() => {
-      playTone(ctx, 380, 0.1, 0.08, 'triangle')
-    }, 50)
+    const now = ctx.currentTime
+
+    // ── 第一层:点火"砰"——很短的低频炸响,~50ms
+    // 模拟底火/发射药点燃瞬间的低音冲击。
+    const thumpDuration = 0.05
+    const thumpSize = Math.floor(ctx.sampleRate * thumpDuration)
+    const thumpBuffer = ctx.createBuffer(1, thumpSize, ctx.sampleRate)
+    const thumpData = thumpBuffer.getChannelData(0)
+    for (let i = 0; i < thumpSize; i++) {
+      // 衰减白噪声
+      thumpData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / thumpSize, 1.5)
+    }
+    const thumpSrc = ctx.createBufferSource()
+    thumpSrc.buffer = thumpBuffer
+
+    const thumpFilter = ctx.createBiquadFilter()
+    thumpFilter.type = 'lowpass'
+    thumpFilter.frequency.value = 220
+
+    const thumpGain = ctx.createGain()
+    thumpGain.gain.setValueAtTime(0.45, now)
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, now + thumpDuration)
+
+    thumpSrc.connect(thumpFilter)
+    thumpFilter.connect(thumpGain)
+    thumpGain.connect(ctx.destination)
+    thumpSrc.start(now)
+    thumpSrc.stop(now + thumpDuration)
+
+    // ── 第二层:升空"嘶——"——~550ms 升调白噪声
+    // 用 bandpass 滤波白噪声,中心频率从 650Hz 指数升到 2400Hz,
+    // 模拟火箭升空时空气流速加快 / 多普勒导致的音调上升。
+    const whooshDuration = 0.55
+    const whooshSize = Math.floor(ctx.sampleRate * whooshDuration)
+    const whooshBuffer = ctx.createBuffer(1, whooshSize, ctx.sampleRate)
+    const whooshData = whooshBuffer.getChannelData(0)
+    for (let i = 0; i < whooshSize; i++) {
+      whooshData[i] = (Math.random() * 2 - 1) * 0.5
+    }
+    const whooshSrc = ctx.createBufferSource()
+    whooshSrc.buffer = whooshBuffer
+
+    const whooshFilter = ctx.createBiquadFilter()
+    whooshFilter.type = 'bandpass'
+    whooshFilter.Q.value = 4.5
+    whooshFilter.frequency.setValueAtTime(650, now + 0.02)
+    whooshFilter.frequency.exponentialRampToValueAtTime(2400, now + 0.02 + whooshDuration)
+
+    const whooshGain = ctx.createGain()
+    // ADSR 风格包络:快速起音 → 持续 → 末段衰减
+    whooshGain.gain.setValueAtTime(0.0001, now + 0.02)
+    whooshGain.gain.exponentialRampToValueAtTime(0.16, now + 0.12)
+    whooshGain.gain.setValueAtTime(0.16, now + 0.02 + whooshDuration * 0.6)
+    whooshGain.gain.exponentialRampToValueAtTime(0.005, now + 0.02 + whooshDuration)
+
+    whooshSrc.connect(whooshFilter)
+    whooshFilter.connect(whooshGain)
+    whooshGain.connect(ctx.destination)
+    whooshSrc.start(now + 0.02)
+    whooshSrc.stop(now + 0.02 + whooshDuration)
   }
 
   const playExplode = () => {
