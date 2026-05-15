@@ -11,7 +11,7 @@ let fireworks: ReturnType<typeof useFireworks> | null = null
 
 const launch = (clientX: number) => {
   fireworks?.launch(clientX)
-  sound.playLaunch()
+  sound.playLaunch(clientX / window.innerWidth)
   // 移动端轻微触觉反馈,桌面端 navigator.vibrate 通常不存在,会静默 noop
   if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
     navigator.vibrate(15)
@@ -36,7 +36,10 @@ onMounted(() => {
 
   fireworks = useFireworks({
     canvas,
-    onExplode: (type, burstScale) => sound.playExplode(type, burstScale),
+    onExplode: (type, burstScale, position) => sound.playExplode(type, burstScale, {
+      pan: position.width > 0 ? position.x / position.width : 0.5,
+      height: position.height > 0 ? position.y / position.height : 0.5,
+    }),
   })
   if (props.initialTheme) fireworks.setTheme(props.initialTheme)
   fireworks.start()
