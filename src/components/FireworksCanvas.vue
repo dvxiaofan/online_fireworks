@@ -10,6 +10,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let fireworks: ReturnType<typeof useFireworks> | null = null
 
 const launch = (clientX: number) => {
+  if (fireworks?.getIsLocked()) return
   fireworks?.launch(clientX)
   sound.playLaunch(clientX / window.innerWidth)
   // 移动端轻微触觉反馈,桌面端 navigator.vibrate 通常不存在,会静默 noop
@@ -17,6 +18,8 @@ const launch = (clientX: number) => {
     navigator.vibrate(15)
   }
 }
+
+const isLocked = () => fireworks?.getIsLocked() ?? false
 
 const handlePointerDown = (event: PointerEvent) => {
   launch(event.clientX)
@@ -26,7 +29,7 @@ const setTheme = (id: ThemeId) => {
   fireworks?.setTheme(id)
 }
 
-defineExpose({ launch, setTheme, getCanvas: () => canvasRef.value })
+defineExpose({ launch, setTheme, isLocked, getCanvas: () => canvasRef.value })
 
 const props = defineProps<{ initialTheme?: ThemeId }>()
 

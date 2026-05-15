@@ -127,9 +127,14 @@ type Particle = {
   subExplosionDelay: number
   subExplosionDone: boolean
   subExplosionType: 'none' | 'spark' | 'cluster'
+  age: number
+  isText: boolean
+  textPhaseDecay: number
 }
 
-const fireworkTypes: FireworkType[] = ['chrysanthemum', 'peony', 'ring', 'willow', 'palm', 'crackle', 'heart', 'star', 'multistage', 'gradient', 'grandShell', 'clusterBomb', 'waterfall', 'text']
+const fireworkTypes: FireworkType[] = ['chrysanthemum', 'peony', 'ring', 'willow', 'palm', 'crackle', 'heart', 'star', 'multistage', 'gradient', 'grandShell', 'clusterBomb', 'waterfall'/* , 'text' */]
+const SPECIAL_LOCK_TYPES: FireworkType[] = ['text', 'clusterBomb', 'grandShell']
+const SPECIAL_UNLOCK_DELAY = 1500
 const textFireworkMessages = ['LOVE', '2026', 'HAPPY', 'WOW']
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min)
@@ -199,27 +204,28 @@ const getTextPoints = (text: string, scale: number) => {
   const ctx = canvas.getContext('2d')
   if (!ctx) return []
 
-  canvas.width = 420
-  canvas.height = 150
+  canvas.width = 600
+  canvas.height = 240
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#fff'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.font = '900 86px Arial, Helvetica, sans-serif'
+  // Impact 笔画粗但 counter space 大,"0"内部空洞清晰可见
+  ctx.font = '140px Impact'
 
   const measured = ctx.measureText(text)
-  const fitScale = Math.min(1, 360 / Math.max(measured.width, 1))
-  ctx.font = `900 ${Math.floor(86 * fitScale)}px Arial, Helvetica, sans-serif`
+  const fitScale = Math.min(1, 520 / Math.max(measured.width, 1))
+  ctx.font = `${Math.floor(140 * fitScale)}px Impact`
   ctx.fillText(text, canvas.width / 2, canvas.height / 2)
 
   const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const points: Array<{ x: number; y: number }> = []
-  const step = 5
+  const step = 3
 
   for (let y = 0; y < canvas.height; y += step) {
     for (let x = 0; x < canvas.width; x += step) {
       const alpha = image.data[(y * canvas.width + x) * 4 + 3]
-      if (alpha > 90) {
+      if (alpha > 80) {
         points.push({
           x: (x - canvas.width / 2) * scale,
           y: (y - canvas.height / 2) * scale,
@@ -228,8 +234,8 @@ const getTextPoints = (text: string, scale: number) => {
     }
   }
 
-  return points.length > 420
-    ? points.filter(() => Math.random() < 420 / points.length)
+  return points.length > 600
+    ? points.filter(() => Math.random() < 600 / points.length)
     : points
 }
 
@@ -244,6 +250,8 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
   let height = 0
   let pixelRatio = 1
   let currentTheme: Theme = getThemeById('default')
+  let isLocked = false
+  let unlockTimerId: ReturnType<typeof setTimeout> | null = null
 
   const sampleHue = () => {
     const bucket = currentTheme.hueBuckets[
@@ -292,6 +300,9 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     const { minX, maxX } = getExplosionXRange(width)
     const { minY, maxY } = getExplosionYRange(height)
     const type = randomItem(fireworkTypes)
+    if (SPECIAL_LOCK_TYPES.includes(type)) {
+      isLocked = true
+    }
     const targetX = clamp(clientX + randomBetween(-64, 64), minX, maxX)
     const targetY = type === 'grandShell' || type === 'clusterBomb' || type === 'waterfall'
       ? randomBetween(minY, Math.max(minY + 40, minY + (maxY - minY) * 0.38))
@@ -400,9 +411,9 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
       vy: Math.sin(angle) * speed * burstScale,
       hue: hue + randomBetween(-18, 18),
       alpha: randomBetween(0.82, 1),
-      decay: isText ? randomBetween(0.0045, 0.007) : isWaterfall ? randomBetween(0.0022, 0.0042) : isWillow ? randomBetween(0.005, 0.009) : isGrandShell || isClusterBomb ? randomBetween(0.006, 0.011) : randomBetween(0.009, 0.018),
+      decay: isText ? randomBetween(0.003, 0.005) : isWaterfall ? randomBetween(0.0022, 0.0042) : isWillow ? randomBetween(0.005, 0.009) : isGrandShell || isClusterBomb ? randomBetween(0.006, 0.011) : randomBetween(0.009, 0.018),
       radius: isText ? randomBetween(1.5, 2.4) : isWaterfall ? randomBetween(1.15, 2.05) : isGrandShell || isClusterBomb ? randomBetween(1.8, 3.1) : isPeony ? randomBetween(2.1, 3.4) : randomBetween(1.2, 2.5),
-      gravity: isText ? randomBetween(0.006, 0.018) : isWaterfall ? randomBetween(0.012, 0.026) : isWillow ? randomBetween(0.08, 0.13) : isGrandShell || isClusterBomb ? randomBetween(0.018, 0.042) : randomBetween(0.035, 0.075),
+      gravity: isText ? randomBetween(0.01, 0.025) : isWaterfall ? randomBetween(0.012, 0.026) : isWillow ? randomBetween(0.08, 0.13) : isGrandShell || isClusterBomb ? randomBetween(0.018, 0.042) : randomBetween(0.035, 0.075),
       friction: isText ? randomBetween(0.988, 0.996) : isWaterfall ? randomBetween(0.996, 0.999) : isWillow ? randomBetween(0.973, 0.985) : isGrandShell || isClusterBomb ? randomBetween(0.984, 0.993) : randomBetween(0.962, 0.986),
       shimmer: isText ? randomBetween(0.006, 0.02) : isWaterfall ? randomBetween(0.006, 0.022) : isGrandShell || isClusterBomb ? randomBetween(0.004, 0.018) : randomBetween(0.012, 0.05),
       crackle: isCrackle && Math.random() > 0.45,
@@ -413,6 +424,9 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
           : 0,
       subExplosionDone: false,
       subExplosionType,
+      age: 0,
+      isText,
+      textPhaseDecay: isText ? randomBetween(0.018, 0.03) : 0,
     })
   }
 
@@ -496,7 +510,7 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
 
     if (rocket.type === 'text') {
       const message = randomItem(textFireworkMessages)
-      const textScale = clamp(rocket.burstScale * 0.78, 0.48, 0.86)
+      const textScale = clamp(rocket.burstScale * 0.52, 0.32, 0.58)
       const textPoints = getTextPoints(message, textScale)
 
       for (const point of textPoints) {
@@ -679,9 +693,10 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     const heightReached = rocket.y <= rocket.targetY
     const horizontalClose = Math.abs(rocket.targetX - rocket.x) < 60
     // 安全网:火箭即将飞出屏幕也立刻爆炸,避免在屏幕外不可见地爆炸。
-    // 弹道公式即使配合随机漂移也基本能命中目标,这里只是兜底。
-    const offScreen = rocket.x < 30 || rocket.x > width - 30
-    const reachedTarget = distanceToTarget <= 28 || (heightReached && horizontalClose) || offScreen
+    const offScreen = rocket.x < 60 || rocket.x > width - 60
+    // 漂移安全网:飞行过久但离目标不远时强制爆炸,避免火箭"遛街"
+    const driftingTooLong = rocket.life > 140 && distanceToTarget < 200
+    const reachedTarget = distanceToTarget <= 28 || (heightReached && horizontalClose) || offScreen || driftingTooLong
 
     if (reachedTarget) {
       rocket.x = rocket.targetX
@@ -737,6 +752,13 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     particle.vy += particle.gravity
     particle.x += particle.vx
     particle.y += particle.vy
+    particle.age += 1
+
+    // 文字烟花两阶段衰减:前 80 帧慢衰减(文字可读),之后加速消散
+    if (particle.isText && particle.age > 80) {
+      particle.decay = particle.textPhaseDecay
+    }
+
     particle.alpha -= particle.decay
 
     if (particle.subExplosionDelay > 0) {
@@ -778,6 +800,9 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
               subExplosionDelay: 0,
               subExplosionDone: false,
               subExplosionType: 'none',
+              age: 0,
+              isText: false,
+              textPhaseDecay: 0,
             })
           }
         }
@@ -856,6 +881,12 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
             width,
             height,
           })
+          if (SPECIAL_LOCK_TYPES.includes(rocket.type)) {
+            unlockTimerId = setTimeout(() => {
+              isLocked = false
+              unlockTimerId = null
+            }, SPECIAL_UNLOCK_DELAY)
+          }
           rockets.splice(index, 1)
           continue
         }
@@ -900,6 +931,10 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
   const stop = () => {
     window.removeEventListener('resize', resize)
     window.cancelAnimationFrame(animationFrameId)
+    if (unlockTimerId) {
+      clearTimeout(unlockTimerId)
+      unlockTimerId = null
+    }
   }
 
   return {
@@ -907,5 +942,6 @@ export const useFireworks = ({ canvas, onExplode }: FireworkOptions) => {
     start,
     stop,
     setTheme,
+    getIsLocked: () => isLocked,
   }
 }
